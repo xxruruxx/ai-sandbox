@@ -21,6 +21,14 @@ Ask a natural language question about the news archive, and the system retrieves
 - Static dataset (CNN/DailyMail) used to validate core retrieval/reasoning before adding a live data ingestion layer
 - Fully local — runs without internet access once models and data are downloaded, and incurs no API costs
 
+## Limitations
+
+- Relevance grading uses a small local LLM (Qwen2.5:3b) for binary 
+  YES/NO judgments, which can be inconsistent across similar or even 
+  near-identical content. This is a known tradeoff of running fully 
+  local on constrained hardware (8GB RAM) rather than using a larger 
+  model or hosted API.
+
 ## Setup
 
 **1. Install Ollama** and pull the required models:
