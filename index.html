@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ai-sandbox — Lisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --surface: #131822;
+    --surface-hover: #171d2a;
+    --text: #E8E6DF;
+    --text-muted: #8A93A6;
+    --brass: #C9A227;
+    --teal: #4A7C82;
+    --border: #2A3140;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Serif 4', serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  .display { font-family: 'Space Grotesk', sans-serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  /* ===== Hex grid signature background ===== */
+  .hex-field {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 640px;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .hex-field svg { width: 100%; height: 100%; }
+  .hex {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 1;
+    opacity: 0;
+    animation: hexIn 1.4s ease-out forwards;
+  }
+  .hex.lit { stroke: var(--brass); opacity: 0; }
+  @keyframes hexIn {
+    to { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hex { animation: none; opacity: 0.5; }
+    .hex.lit { opacity: 0.6; }
+  }
+
+  /* ===== Layout ===== */
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 28px;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    padding: 28px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+  .brand span { color: var(--brass); }
+
+  nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    margin-left: 28px;
+    transition: color 0.2s ease;
+  }
+  nav a:hover, nav a:focus-visible { color: var(--text); }
+
+  /* ===== Hero ===== */
+  .hero {
+    padding: 140px 0 80px;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--teal);
+    letter-spacing: 0.06em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--teal);
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: clamp(2.4rem, 5.5vw, 4rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    max-width: 14ch;
+    margin-bottom: 28px;
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--brass);
+  }
+
+  .lede {
+    font-size: 19px;
+    color: var(--text-muted);
+    max-width: 52ch;
+    margin-bottom: 8px;
+  }
+
+  /* ===== Section labels ===== */
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 100px 0 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ===== Project cards ===== */
+  .projects {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+  }
+
+  .project {
+    background: var(--surface);
+    padding: 28px 30px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: start;
+    transition: background 0.2s ease;
+  }
+  .project:hover { background: var(--surface-hover); }
+
+  .project-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 19px;
+    margin-bottom: 8px;
+  }
+
+  .project-desc {
+    color: var(--text-muted);
+    font-size: 15.5px;
+    max-width: 56ch;
+  }
+
+  .project-stack {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--teal);
+    margin-top: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  .status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 5px 10px;
+    border-radius: 3px;
+    white-space: nowrap;
+    height: fit-content;
+  }
+  .status.live {
+    color: #6fbf7a;
+    background: rgba(111, 191, 122, 0.1);
+    border: 1px solid rgba(111, 191, 122, 0.3);
+  }
+  .status.building {
+    color: var(--brass);
+    background: rgba(201, 162, 39, 0.1);
+    border: 1px solid rgba(201, 162, 39, 0.3);
+  }
+  .status.planned {
+    color: var(--text-muted);
+    background: rgba(138, 147, 166, 0.08);
+    border: 1px solid var(--border);
+  }
+
+  /* ===== Footer ===== */
+  footer {
+    margin-top: 120px;
+    padding: 40px 0 60px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  footer a { color: var(--text-muted); text-decoration: none; }
+  footer a:hover { color: var(--brass); }
+
+  @media (max-width: 640px) {
+    .project { grid-template-columns: 1fr; }
+    nav a { margin-left: 16px; font-size: 12px; }
+    footer { flex-direction: column; gap: 12px; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hex-field" aria-hidden="true">
+  <svg viewBox="0 0 920 640" preserveAspectRatio="xMidYMin slice"></svg>
+</div>
+
+<div class="wrap">
+
+  <header>
+    <div class="brand">ai<span>-</span>sandbox</div>
+    <nav>
+      <a href="https://github.com/xxruruxx/ai-sandbox" target="_blank" rel="noopener">github</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">DATA ENGINEER · BUILDING AGENTIC SYSTEMS</div>
+    <h1>Pipelines that <em>reason</em>, not just move data.</h1>
+    <p class="lede">
+      A working sandbox of agentic systems built on production data-engineering
+      instincts — retrieval that grades itself, scrapers that handle their own
+      failures, and a graph-theory background looking for its next application.
+    </p>
+  </section>
+
+  <div class="section-label">
+    <span>Projects</span>
+    <span>Status</span>
+  </div>
+
+  <div class="projects">
+
+    <div class="project">
+      <div>
+        <div class="project-name">News Archive Agent</div>
+        <div class="project-desc">
+          Agentic RAG over a historical news corpus — retrieves, grades its own
+          results, rewrites the query and retries when retrieval comes up empty,
+          then answers with cited sources.
+        </div>
+        <div class="project-stack">Ollama · LlamaIndex · ChromaDB · Streamlit</div>
+      </div>
+      <div class="status live">LIVE</div>
+    </div>
+
+    <div class="project">
+      <div>
+        <div class="project-name">Pag-IBIG Listing Scraper</div>
+        <div class="project-desc">
+          Browser automation across a cascading region → province → city filter
+          chain, decoding structured property data straight from the site's own
+          backend payloads — auction dates, pricing, GPS coordinates.
+        </div>
+        <div class="project-stack">Playwright · Python</div>
+      </div>
+      <div class="status live">LIVE</div>
+    </div>
+
+    <div class="project">
+      <div>
+        <div class="project-name">Crypto Commentator Agent</div>
+        <div class="project-desc">
+          Same agentic retrieval architecture, pointed at live market news and
+          price data instead of a static archive — plain-language commentary,
+          not trading advice.
+        </div>
+        <div class="project-stack">RSS · CoinGecko · Agentic RAG</div>
+      </div>
+      <div class="status building">BUILDING</div>
+    </div>
+
+    <div class="project">
+      <div>
+        <div class="project-name">Liquidity Graph + RL</div>
+        <div class="project-desc">
+          A token/pool graph learned rather than hand-coded — staged build
+          toward a GNN-informed reinforcement learning agent reasoning over
+          real liquidity data.
+        </div>
+        <div class="project-stack">PyTorch Geometric · Gymnasium</div>
+      </div>
+      <div class="status planned">PLANNED</div>
+    </div>
+
+  </div>
+
+  <footer>
+    <span>Updated as the sandbox grows.</span>
+    <a href="https://github.com/xxruruxx/ai-sandbox" target="_blank" rel="noopener">github.com/xxruruxx/ai-sandbox →</a>
+  </footer>
+
+</div>
+
+<script>
+  // Signature hex-grid: generate a honeycomb lattice, referencing the
+  // honeycomb-graph thesis running underneath every project here.
+  (function () {
+    const svg = document.querySelector('.hex-field svg');
+    const ns = 'http://www.w3.org/2000/svg';
+    const r = 42;
+    const w = r * Math.sqrt(3);
+    const h = r * 2;
+    const cols = 16;
+    const rows = 9;
+
+    function hexPoints(cx, cy) {
+      const pts = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 180 * (60 * i - 30);
+        pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
+      }
+      return pts.join(' ');
+    }
+
+    const litIndices = new Set();
+    while (litIndices.size < 5) {
+      litIndices.add(Math.floor(Math.random() * cols * rows));
+    }
+
+    let idx = 0;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const cx = col * w + (row % 2 ? w / 2 : 0) - 40;
+        const cy = row * (h * 0.75) - 60;
+        const poly = document.createElementNS(ns, 'polygon');
+        poly.setAttribute('points', hexPoints(cx, cy));
+        poly.setAttribute('class', litIndices.has(idx) ? 'hex lit' : 'hex');
+        poly.style.animationDelay = (Math.random() * 1.2).toFixed(2) + 's';
+        svg.appendChild(poly);
+        idx++;
+      }
+    }
+  })();
+</script>
+
+</body>
+</html>
