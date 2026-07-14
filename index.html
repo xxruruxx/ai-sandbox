@@ -16,10 +16,14 @@
     --brass: #C9A227;
     --teal: #4A7C82;
     --border: #2A3140;
+
+    /* single mono type scale, used everywhere for consistency */
+    --mono-xs: 11px;
+    --mono-sm: 12px;
+    --mono-md: 13px;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   html { scroll-behavior: smooth; }
 
   body {
@@ -51,9 +55,7 @@
     animation: hexIn 1.4s ease-out forwards;
   }
   .hex.lit { stroke: var(--brass); opacity: 0; }
-  @keyframes hexIn {
-    to { opacity: 1; }
-  }
+  @keyframes hexIn { to { opacity: 1; } }
 
   @media (prefers-reduced-motion: reduce) {
     .hex { animation: none; opacity: 0.5; }
@@ -76,32 +78,38 @@
     align-items: center;
   }
 
-  .brand {
+  .brand { display: flex; align-items: center; gap: 10px; }
+
+  .logo-mark { width: 30px; height: 30px; flex-shrink: 0; }
+  .logo-mark polygon { fill: none; stroke-width: 1.3; }
+  .logo-mark .a { stroke: var(--brass); opacity: 0.9; }
+  .logo-mark .b { stroke: var(--teal); opacity: 0.75; }
+  .logo-mark .c { stroke: var(--text-muted); opacity: 0.5; }
+
+  .brand-text {
     font-family: 'Space Grotesk', sans-serif;
     font-weight: 600;
     font-size: 15px;
     letter-spacing: 0.02em;
   }
-  .brand span { color: var(--brass); }
+  .brand-text span { color: var(--brass); }
 
   nav a {
     color: var(--text-muted);
     text-decoration: none;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
+    font-size: var(--mono-sm);
     margin-left: 28px;
     transition: color 0.2s ease;
   }
   nav a:hover, nav a:focus-visible { color: var(--text); }
 
   /* ===== Hero ===== */
-  .hero {
-    padding: 140px 0 80px;
-  }
+  .hero { padding: 140px 0 80px; }
 
   .eyebrow {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
+    font-size: var(--mono-sm);
     color: var(--teal);
     letter-spacing: 0.06em;
     margin-bottom: 20px;
@@ -125,10 +133,7 @@
     max-width: 14ch;
     margin-bottom: 28px;
   }
-  h1 em {
-    font-style: normal;
-    color: var(--brass);
-  }
+  h1 em { font-style: normal; color: var(--brass); }
 
   .lede {
     font-size: 19px;
@@ -140,7 +145,7 @@
   /* ===== Section labels ===== */
   .section-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
+    font-size: var(--mono-sm);
     color: var(--text-muted);
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -162,7 +167,7 @@
 
   .project {
     background: var(--surface);
-    padding: 28px 30px;
+    padding: 26px 30px;
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 20px;
@@ -178,28 +183,33 @@
     margin-bottom: 8px;
   }
 
-  .project-desc {
-    color: var(--text-muted);
-    font-size: 15.5px;
-    max-width: 56ch;
-  }
+  .project-desc { color: var(--text-muted); font-size: 15.5px; max-width: 56ch; }
 
   .project-stack {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: var(--mono-sm);
     color: var(--teal);
     margin-top: 12px;
     letter-spacing: 0.02em;
   }
 
+  /* right column: status + compact flow ring, stacked */
+  .project-side {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding-right: 14px;
+    margin-right: 16px;
+  }
+
   .status {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: var(--mono-xs);
     letter-spacing: 0.08em;
     padding: 5px 10px;
     border-radius: 3px;
     white-space: nowrap;
-    height: fit-content;
   }
   .status.live {
     color: #6fbf7a;
@@ -217,6 +227,39 @@
     border: 1px solid var(--border);
   }
 
+  /* ===== Compact circular flow indicator ===== */
+  .flow-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+  .flow-caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--mono-xs);
+    color: var(--text-muted);
+    text-align: center;
+    width: 150px;
+    line-height: 1.6;
+  }
+  .flow-caption .sep { color: var(--border); margin: 0 4px; display: inline-block; }
+  .flow-block[data-status="live"] .flow-caption { color: var(--text); }
+
+  .flow-ring { width: 56px; height: 56px; cursor: default; }
+  .flow-ring circle.track { fill: none; stroke: var(--border); stroke-width: 1.2; }
+  .flow-ring[data-status="live"] circle.track { stroke: var(--teal); stroke-opacity: 0.5; }
+  .flow-ring[data-status="building"] circle.track {
+    stroke: var(--brass); stroke-opacity: 0.4; stroke-dasharray: 2 3;
+  }
+  .flow-ring[data-status="planned"] circle.track {
+    stroke: var(--text-muted); stroke-opacity: 0.35; stroke-dasharray: 1.5 3.5;
+  }
+  .flow-ring .node { fill: var(--bg); stroke: var(--border); stroke-width: 1; }
+  .flow-ring[data-status="live"] .node { stroke: var(--teal); stroke-opacity: 0.7; }
+  .flow-ring[data-status="building"] .node { stroke: var(--brass); stroke-opacity: 0.6; }
+  .flow-ring .pulse { fill: var(--brass); opacity: 0; }
+  .flow-ring[data-status="live"] .pulse { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flow-ring .pulse { display: none; }
+  }
+
   /* ===== Footer ===== */
   footer {
     margin-top: 120px;
@@ -227,14 +270,15 @@
     align-items: center;
     color: var(--text-muted);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
+    font-size: var(--mono-sm);
   }
   footer a { color: var(--text-muted); text-decoration: none; }
   footer a:hover { color: var(--brass); }
 
   @media (max-width: 640px) {
     .project { grid-template-columns: 1fr; }
-    nav a { margin-left: 16px; font-size: 12px; }
+    .project-side { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; }
+    nav a { margin-left: 16px; font-size: var(--mono-xs); }
     footer { flex-direction: column; gap: 12px; align-items: flex-start; }
   }
 </style>
@@ -248,7 +292,14 @@
 <div class="wrap">
 
   <header>
-    <div class="brand">ai<span>-</span>sandbox</div>
+    <div class="brand">
+      <svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <polygon class="a" points="20,3 33,10.5 33,25.5 20,33 7,25.5 7,10.5" />
+        <polygon class="b" points="20,9 28.5,14 28.5,24 20,29 11.5,24 11.5,14" />
+        <polygon class="c" points="20,15 24,17.3 24,21.7 20,24 16,21.7 16,17.3" />
+      </svg>
+      <div class="brand-text">ai<span>-</span>sandbox</div>
+    </div>
     <nav>
       <a href="https://github.com/xxruruxx/ai-sandbox" target="_blank" rel="noopener">github</a>
     </nav>
@@ -281,7 +332,13 @@
         </div>
         <div class="project-stack">Ollama · LlamaIndex · ChromaDB · Streamlit</div>
       </div>
-      <div class="status live">LIVE</div>
+      <div class="project-side">
+        <div class="status live">LIVE</div>
+        <div class="flow-block" data-status="live">
+          <svg class="flow-ring" data-status="live" data-stages="Dataset,Chunk+Embed,Vector Store,Agentic Loop,Answer" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Dataset<span class="sep">·</span>Embed<span class="sep">·</span>Vectors<span class="sep">·</span>Agent Loop<span class="sep">·</span>Answer</div>
+        </div>
+      </div>
     </div>
 
     <div class="project">
@@ -294,7 +351,13 @@
         </div>
         <div class="project-stack">Playwright · Python</div>
       </div>
-      <div class="status live">LIVE</div>
+      <div class="project-side">
+        <div class="status live">LIVE</div>
+        <div class="flow-block" data-status="live">
+          <svg class="flow-ring" data-status="live" data-stages="Filter Chain,Paginate,Decode Payload,CSV" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Filter Chain<span class="sep">·</span>Paginate<span class="sep">·</span>Decode<span class="sep">·</span>CSV</div>
+        </div>
+      </div>
     </div>
 
     <div class="project">
@@ -307,7 +370,13 @@
         </div>
         <div class="project-stack">RSS · CoinGecko · Agentic RAG</div>
       </div>
-      <div class="status building">BUILDING</div>
+      <div class="project-side">
+        <div class="status building">BUILDING</div>
+        <div class="flow-block" data-status="building">
+          <svg class="flow-ring" data-status="building" data-stages="News+Price,Agentic Loop,Commentary" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">News+Price<span class="sep">·</span>Agent Loop<span class="sep">·</span>Commentary</div>
+        </div>
+      </div>
     </div>
 
     <div class="project">
@@ -320,7 +389,13 @@
         </div>
         <div class="project-stack">PyTorch Geometric · Gymnasium</div>
       </div>
-      <div class="status planned">PLANNED</div>
+      <div class="project-side">
+        <div class="status planned">PLANNED</div>
+        <div class="flow-block" data-status="planned">
+          <svg class="flow-ring" data-status="planned" data-stages="Pool Data,Graph,RL Agent" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Pool Data<span class="sep">·</span>Graph<span class="sep">·</span>RL Agent</div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -333,8 +408,7 @@
 </div>
 
 <script>
-  // Signature hex-grid: generate a honeycomb lattice, referencing the
-  // honeycomb-graph thesis running underneath every project here.
+  // Signature hex-grid background
   (function () {
     const svg = document.querySelector('.hex-field svg');
     const ns = 'http://www.w3.org/2000/svg';
@@ -371,6 +445,64 @@
         idx++;
       }
     }
+  })();
+
+  // Compact circular flow indicators: each stage is a small node placed
+  // around a ring. LIVE rings get an orbiting pulse; others stay static
+  // and dashed. Stage names live in the <title> tooltip, not on-canvas,
+  // so the ring stays small and uncluttered.
+  (function () {
+    const ns = 'http://www.w3.org/2000/svg';
+    const rings = document.querySelectorAll('.flow-ring');
+
+    rings.forEach((svg) => {
+      const stages = svg.dataset.stages.split(',');
+      const status = svg.dataset.status;
+      const cx = 28, cy = 28, r = 20;
+      const n = stages.length;
+
+      const track = document.createElementNS(ns, 'circle');
+      track.setAttribute('class', 'track');
+      track.setAttribute('cx', cx);
+      track.setAttribute('cy', cy);
+      track.setAttribute('r', r);
+      svg.appendChild(track);
+
+      const positions = [];
+      for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+        const nx = cx + r * Math.cos(angle);
+        const ny = cy + r * Math.sin(angle);
+        positions.push({ nx, ny });
+
+        const node = document.createElementNS(ns, 'circle');
+        node.setAttribute('class', 'node');
+        node.setAttribute('cx', nx);
+        node.setAttribute('cy', ny);
+        node.setAttribute('r', 3.2);
+        svg.appendChild(node);
+      }
+
+      if (status === 'live') {
+        const pulse = document.createElementNS(ns, 'circle');
+        pulse.setAttribute('class', 'pulse');
+        pulse.setAttribute('r', 2.4);
+
+        const animateMotion = document.createElementNS(ns, 'animateMotion');
+        animateMotion.setAttribute('dur', `${n * 1.3}s`);
+        animateMotion.setAttribute('repeatCount', 'indefinite');
+
+        let d = `M ${positions[0].nx} ${positions[0].ny}`;
+        for (let i = 1; i <= n; i++) {
+          const p = positions[i % n];
+          d += ` L ${p.nx} ${p.ny}`;
+        }
+        animateMotion.setAttribute('path', d);
+
+        pulse.appendChild(animateMotion);
+        svg.appendChild(pulse);
+      }
+    });
   })();
 </script>
 
