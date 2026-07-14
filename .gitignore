@@ -18,3 +18,7 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Playwright scraper outputs
+playwright-scraper/*.csv
+playwright-scraper/*.png
