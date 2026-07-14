@@ -1,46 +1,66 @@
 ﻿from playwright.sync_api import sync_playwright
 import time
-import re
 import csv
+import base64
+import json
 
-def parse_listing(text):
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
 
-    data = {
-        "name": lines[0] if len(lines) > 0 else None,
-        "house_type": None,
-        "auction_dates": None,
-        "status": None, 
-        "price": None,
-        "floor_area_sqm": None,
-        "lot_area_sqm": None,
-        "auction_type": "First Auction (New Listing)" # this scrape only covers this tab
-    }
+def decode_property_data(encoded_str):
+    try:
+        decoded_bytes = base64.b64decode(encoded_str)
+        decoded_str = decoded_bytes.decode("utf-8", errors="replace")  # replace bad bytes instead of crashing
+        return json.loads(decoded_str)
+    except Exception as e:
+        return {"decode_error": str(e)}
 
-    # NOTE: Same property name appearing multiple times is expected behavior —
-    # each row represents a distinct unit/lot within that subdivision, with its
-    # own price, area, and auction schedule. Not a scraping bug.
 
-    sqm_values = []
-    for line in lines:
-        if "occupied" in line.lower():
-            data["status"] = line
-        elif "-" in line and any(m in line for m in ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]):
-            data["auction_dates"] = line.replace("\xa0", " ").replace("|", "").strip()
-        elif "₱" in line:
-            data["price"] = line
-        elif "sqm" in line.lower():
-            sqm_values.append(line)
-        elif line in ["Row House", "Single Attached", "Single Detached", "Townhouse", "Condominium", "Duplex"]:
-            data["house_type"] = line
+def extract_all_pages(page, city_name):
+    """Extract listings from the current search results, looping through pagination."""
+    all_listings = []
+    page_num = 1
 
-    # First sqm value = floor area, second = lot area 
-    if len(sqm_values) >=1:
-        data["floor_area_sqm"] = sqm_values[0]
-    if len(sqm_values) >=2:
-        data["lot_area_sqm"] = sqm_values[1]
+    while True:
+        page.wait_for_timeout(2000)
+        listings = page.query_selector_all("form#submitOffer_search")
 
-    return data
+        for listing in listings:
+            details_link = listing.query_selector("a.view-more-details")
+            if not details_link:
+                print(f"    WARNING: no details link found for a listing in {city_name}")
+                continue
+
+            encoded = details_link.get_attribute("data-property")
+            if not encoded:
+                print(f"    WARNING: no data-property attribute for a listing in {city_name}")
+                continue
+
+            data = decode_property_data(encoded)
+
+            if "decode_error" in data:
+                print(f"    DECODE FAILED for a listing in {city_name}: {data['decode_error']}")
+                continue  # skip this broken record instead of appending it
+
+            data["city_searched"] = city_name
+            all_listings.append(data)
+
+        print(f"  Page {page_num}: extracted {len(listings)} listings (running total: {len(all_listings)})")
+
+        next_button = page.query_selector("a:has-text('Next'), li.next a, [aria-label='Next']")
+        if next_button:
+            classes = next_button.get_attribute("class") or ""
+            if "disabled" in classes.lower():
+                break
+            try:
+                next_button.click()
+                page_num += 1
+                page.wait_for_timeout(3000)
+            except Exception:
+                break
+        else:
+            break
+
+    return all_listings
+
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=False)
@@ -56,68 +76,81 @@ with sync_playwright() as p:
                 timeout=30000
             )
             print(f"Attempt {attempt + 1} - Status code: {response.status}")
-
             if response.status == 200:
                 page.wait_for_load_state("networkidle")
                 print("Page loaded successfully")
                 loaded = True
                 break
             else:
-                wait_time = 60 * (attempt + 1)  # 60s, then 120s, then 180s
-                print(f"Non-200 status ({response.status}), waiting {wait_time}s before retry...")
+                wait_time = 60 * (attempt + 1)
+                print(f"Non-200 status, waiting {wait_time}s...")
                 time.sleep(wait_time)
-
         except Exception as e:
             wait_time = 60 * (attempt + 1)
             print(f"Attempt {attempt + 1} failed: {e}")
-            print(f"Waiting {wait_time}s before retry...")
             time.sleep(wait_time)
 
     if not loaded:
-        print("Could not load the page after retries. Try again later.")
+        print("Could not load page. Try again later.")
         browser.close()
         exit()
 
     page.locator("#region").scroll_into_view_if_needed()
-    page.select_option("#region", "040000000") # CALABARZON
+    page.select_option("#region", "040000000")  # CALABARZON
     page.wait_for_timeout(2000)
 
-    page.select_option("#province", "043400000") # LAGUNA
-    page.wait_for_timeout(2000) # 
-
-    page.select_option("#city", "043405000") # CITY OF CALAMBA
+    page.select_option("#province", "043400000")  # LAGUNA
     page.wait_for_timeout(2000)
 
-    # Click the Search button (it's an <a> tag, not a <button>)
-    page.click("#search-button")
-    page.wait_for_timeout(5000) # give results time to load
+    city_options = page.eval_on_selector_all(
+        "#city option",
+        "opts => opts.filter(o => o.value).map(o => ({value: o.value, text: o.textContent.trim()}))"
+    )
+    print(f"Found {len(city_options)} cities in Laguna\n")
 
-    # Extract all listing cards
-    listings = page.query_selector_all("form#submitOffer_search")
-    print(f"Found {len(listings)} listing forms")
+    master_listings = []
 
+    for city in city_options:
+            print(f"--- Scraping {city['text']} ---")
+            try:
+                page.select_option("#city", city["value"])
+                page.wait_for_timeout(1500)
 
-    parsed_listings = []
-    for listing in listings:
-        text = listing.inner_text()
-        parsed = parse_listing(text)
-        parsed_listings.append(parsed)
-    
+                selected_value = page.eval_on_selector("#city", "el => el.value")
+                if selected_value != city["value"]:
+                    print(f"  WARNING: selection mismatch, retrying...")
+                    page.select_option("#city", city["value"])
+                    page.wait_for_timeout(1500)
 
-    for i, p_data in enumerate(parsed_listings):
-        print(f"{i+1}. {p_data}")
+                page.click("#search-button")
+                page.wait_for_load_state("networkidle")  # wait for network to settle, not just a fixed timeout
+                page.wait_for_timeout(2000)  # small extra buffer after network settles
 
-    # CSV export
-    fieldnames = ["name", "house_type", "auction_dates", "status", "price", "floor_area_sqm", "lot_area_sqm", "auction_type"]
-    with open("laguna_calamba_listings.csv", "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                city_listings = extract_all_pages(page, city["text"])
+                print(f"  {city['text']}: {len(city_listings)} listings")
+                master_listings.extend(city_listings)
+
+            except Exception as e:
+                print(f"  Error scraping {city['text']}: {e}")
+
+            time.sleep(8)
+
+    print(f"\nTotal listings across all Laguna cities: {len(master_listings)}")
+
+    # Save to CSV -- using the real decoded field names from Pag-IBIG's own data
+    fieldnames = [
+        "ropa_id", "batch_no", "subdivision", "prop_location", "prop_type",
+        "tct_cct_no", "lot_area", "floor_area", "min_sellprice", "occupancy",
+        "status", "status_bid", "disposal_type", "start_datetime", "end_datetime",
+        "appr_date", "inspection_date", "ins_remarks", "remarks", "city_muni",
+        "handling_hbc", "contact_hbc", "email_hbc", "survey_no", "city_searched"
+    ]
+
+    with open("laguna_all_listings.csv", "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
-        for p_data in parsed_listings:
-            writer.writerow(p_data)
-    
-    print(f"Saved {len(parsed_listings)} listings to laguna_calamba_listings.csv")
+        for row in master_listings:
+            writer.writerow(row)
 
-    page.screenshot(path="search_results_screenshot.png", full_page=True)
-    print("Done. Closing in 15 seconds.")
-    time.sleep(15)
+    print(f"Saved {len(master_listings)} listings to laguna_all_listings.csv")
     browser.close()
