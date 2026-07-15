@@ -61,6 +61,23 @@ def extract_all_pages(page, city_name):
 
     return all_listings
 
+def validate_listings(listings, city_name, min_expected=1):
+    """Catch silent failures before they reach the CSV -- this is exactly
+    the kind of check that would have caught the Biñan encoding bug
+    automatically instead of relying on manual spot-checking."""
+    issues = []
+
+    if len(listings) < min_expected:
+        issues.append(f"{city_name}: only {len(listings)} listings found (expected at least {min_expected})")
+
+    critical_fields = ["ropa_id", "min_sellprice", "prop_location"]
+    for i, listing in enumerate(listings):
+        for field in critical_fields:
+            if not listing.get(field):
+                issues.append(f"{city_name}: listing #{i} missing critical field '{field}'")
+
+    return issues
+
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=False)
@@ -82,11 +99,11 @@ with sync_playwright() as p:
                 loaded = True
                 break
             else:
-                wait_time = 60 * (attempt + 1)
+                wait_time = 60 * (2 ** attempt)
                 print(f"Non-200 status, waiting {wait_time}s...")
                 time.sleep(wait_time)
         except Exception as e:
-            wait_time = 60 * (attempt + 1)
+            wait_time = 60 * (2 ** attempt)
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(wait_time)
 
@@ -127,6 +144,14 @@ with sync_playwright() as p:
                 page.wait_for_timeout(2000)  # small extra buffer after network settles
 
                 city_listings = extract_all_pages(page, city["text"])
+
+                # Validate before accepting this city's data
+                issues = validate_listings(city_listings, city["text"])
+                if issues:
+                    print(f"  VALIDATION ISSUES for {city['text']}:")
+                    for issue in issues:
+                        print(f"    - {issue}")
+                    
                 print(f"  {city['text']}: {len(city_listings)} listings")
                 master_listings.extend(city_listings)
 
