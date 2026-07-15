@@ -98,11 +98,24 @@ Respond ONLY as JSON: {{"action": "...", "reason": "..."}}"""
     # If relevant context genuinely exists, "answer" is always correct --
     # override any contradictory LLM decision rather than trust a small
     # model's arithmetic over ground truth we already computed.
+
+    # Guard 1: relevant context exists -- "answer" is always correct.
     if found > 0 and llm_action != "answer":
         print(f"  [decide] OVERRIDE: model said '{llm_action}' but {found} relevant "
-              f"chunk(s) exist -- forcing 'answer' (model reasoning was factually wrong)")
+              f"chunk(s) exist -- forcing 'answer'")
         llm_action = "answer"
         llm_reason = f"[corrected] {found} relevant chunk(s) found; overriding model's contradictory decision"
+
+    # Guard 2: NO relevant context exists -- "answer" is never allowed,
+    # since the model has nothing grounded to answer from and will
+    # hallucinate from its own training data instead (exactly what RAG
+    # is meant to prevent). Force a rewrite if attempts remain, else give up.
+    if found == 0 and llm_action == "answer":
+        forced = "rewrite_query" if attempts_left > 0 else "give_up"
+        print(f"  [decide] OVERRIDE: model said 'answer' with ZERO relevant chunks "
+              f"-- forcing '{forced}' (model was about to hallucinate)")
+        llm_action = forced
+        llm_reason = f"[corrected] no relevant context exists; model attempted to answer from its own knowledge instead of admitting it lacks grounded context"
 
     state["action"] = llm_action
     state["action_reason"] = llm_reason
@@ -178,8 +191,8 @@ app = graph.compile()
 # ---- Run it ----
 if __name__ == "__main__":
     initial_state = {
-        "original_question": "What happened with the Minneapolis bridge?",
-        "current_query": "What happened with the Minneapolis bridge?",
+        "original_question": "Who is the current president of Brazil?",
+        "current_query": "Who is the current president of Brazil?",
         "nodes": [],
         "relevant_nodes": [],
         "attempts": 0,
