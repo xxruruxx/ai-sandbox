@@ -21,4 +21,5 @@ Thumbs.db
 
 # Playwright scraper outputs
 playwright-scraper/*.csv
+!playwright-scraper/calabarzon_all_listings.csv
 playwright-scraper/*.png
