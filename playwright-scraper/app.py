@@ -1,5 +1,6 @@
 ﻿import streamlit as st
 import pandas as pd
+import os
 
 st.set_page_config(page_title="CALABARZON Listings", page_icon="🏠", layout="wide")
 
@@ -8,7 +9,8 @@ st.caption("CALABARZON region — scraped from the Online Public Auction platfor
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("calabarzon_all_listings.csv")
+    csv_path = os.path.join(os.path.dirname(__file__), "calabarzon_all_listings.csv")
+    df = pd.read_csv(csv_path)
 
     # Parse GPS coordinates out of ins_remarks (format: "lat, lng")
     def parse_coords(val):
