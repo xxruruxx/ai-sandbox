@@ -227,6 +227,32 @@
     border: 1px solid var(--border);
   }
 
+  /* ===== Live demo link within a card ===== */
+  .project-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--mono-sm);
+    color: #6fbf7a;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(111, 191, 122, 0.35);
+    padding-bottom: 1px;
+    width: fit-content;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+  .project-link:hover { color: #8ad494; border-color: #8ad494; }
+  .project-link::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6fbf7a;
+    box-shadow: 0 0 6px rgba(111, 191, 122, 0.8);
+    flex-shrink: 0;
+  }
+
   /* ===== Compact circular flow indicator ===== */
   .flow-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
@@ -347,15 +373,19 @@
         <div class="project-desc">
           Browser automation across a cascading region → province → city filter
           chain, decoding structured property data straight from the site's own
-          backend payloads — auction dates, pricing, GPS coordinates.
+          backend payloads — auction dates, pricing, GPS coordinates. Runs 5
+          provinces concurrently across all of CALABARZON.
         </div>
-        <div class="project-stack">Playwright · Python</div>
+        <div class="project-stack">Playwright · Python · Streamlit</div>
+        <a class="project-link" href="https://xxruruxx-calabarzon-listings.streamlit.app" target="_blank" rel="noopener">
+          live dashboard — 604 listings, filterable + mapped
+        </a>
       </div>
       <div class="project-side">
         <div class="status live">LIVE</div>
         <div class="flow-block" data-status="live">
-          <svg class="flow-ring" data-status="live" data-stages="Filter Chain,Paginate,Decode Payload,CSV" viewBox="0 0 56 56"></svg>
-          <div class="flow-caption">Filter Chain<span class="sep">·</span>Paginate<span class="sep">·</span>Decode<span class="sep">·</span>CSV</div>
+          <svg class="flow-ring" data-status="live" data-stages="Filter Chain,Parallel Provinces,Decode Payload,Validate,Dashboard" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Filter Chain<span class="sep">·</span>Parallel<span class="sep">·</span>Decode<span class="sep">·</span>Validate<span class="sep">·</span>Dashboard</div>
         </div>
       </div>
     </div>
