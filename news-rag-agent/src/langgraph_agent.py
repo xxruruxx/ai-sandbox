@@ -10,7 +10,7 @@ import chromadb
 from langgraph.graph import StateGraph, END
 
 CHROMA_PATH = "./chroma_db"
-COLLECTION_NAME = "news_articles"
+COLLECTION_NAME = "current_events_articles"
 
 Settings.llm = Ollama(model="qwen2.5:3b", request_timeout=120.0)
 Settings.embed_model = OllamaEmbedding(model_name="nomic-embed-text")

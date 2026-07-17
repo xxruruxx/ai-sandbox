@@ -5,14 +5,29 @@ import os
 sys.path.append(os.path.dirname(__file__))
 from src.langgraph_agent import app as agent_graph
 
-st.set_page_config(page_title="News Research Agent", page_icon="📰")
+st.set_page_config(page_title="GazetteAI", page_icon="📰")
 
-st.title("News Research Agent")
-st.caption("Agentic RAG (LangGraph) over CNN/DailyMail archive — LLM-driven routing with factual guardrails")
+st.title("GazetteAI")
+st.caption("Agentic news research — grounded in Wikipedia's Current Events Portal, updated daily")
 
-question = st.text_input("Ask a question:", placeholder="What happened with the Minneapolis bridge?")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if st.button("Search") and question:
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
+        if msg.get("sources"):
+            with st.expander("Sources"):
+                for s in msg["sources"]:
+                    st.write(f"- [{s['title']}]({s['link']}) — {s['date']}")
+
+question = st.chat_input("Ask about current news...")
+
+if question:
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.write(question)
+
     initial_state = {
         "original_question": question,
         "current_query": question,
@@ -26,27 +41,28 @@ if st.button("Search") and question:
     }
 
     final_state = None
+    with st.chat_message("assistant"):
+        with st.status("Agent working...", expanded=False) as status:
+            for step in agent_graph.stream(initial_state, stream_mode="values"):
+                final_state = step
+                if step.get("action"):
+                    found = len(step.get("relevant_nodes", []))
+                    status.write(f"Found {found} relevant chunk(s) → decided: **{step['action']}**")
+                    if step.get("action_reason"):
+                        status.write(f"↳ {step['action_reason']}")
+            status.update(label="Done", state="complete")
 
-    with st.status("Agent working...", expanded=True) as status:
-        for step in agent_graph.stream(initial_state, stream_mode="values"):
-            final_state = step
+        answer = final_state["final_answer"] if final_state else "Something went wrong."
+        st.write(answer)
 
-            if step.get("nodes") and not step.get("relevant_nodes") and step.get("action") == "":
-                status.write(f"Retrieving for: \"{step['current_query']}\"")
+        sources = []
+        if final_state and final_state.get("relevant_nodes"):
+            with st.expander("Sources"):
+                for node in final_state["relevant_nodes"]:
+                    title = node.metadata.get("title", "Unknown")
+                    link = node.metadata.get("link", "#")
+                    date = node.metadata.get("date", "")
+                    st.write(f"- [{title}]({link}) — {date}")
+                    sources.append({"title": title, "link": link, "date": date})
 
-            if step.get("action"):
-                found = len(step.get("relevant_nodes", []))
-                status.write(f"Found {found} relevant chunk(s) → decided: **{step['action']}**")
-                if step.get("action_reason"):
-                    status.write(f"↳ {step['action_reason']}")
-
-        status.update(label="Agent finished", state="complete")
-
-    st.subheader("Answer")
-    st.write(final_state["final_answer"] if final_state else "Something went wrong.")
-
-    if final_state and final_state.get("relevant_nodes"):
-        st.subheader("Sources")
-        for node in final_state["relevant_nodes"]:
-            with st.expander(f"Article {node.metadata.get('id', 'unknown')} (relevance: {node.score:.3f})"):
-                st.write(node.text[:500] + "...")
+    st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
