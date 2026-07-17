@@ -227,6 +227,14 @@
     border: 1px solid var(--border);
   }
 
+  .project-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--mono-xs);
+    color: var(--text-muted);
+    margin-top: 10px;
+    font-style: italic;
+  }
+
   /* ===== Live demo link within a card ===== */
   .project-link {
     display: inline-flex;
@@ -264,7 +272,7 @@
     width: 150px;
     line-height: 1.6;
   }
-  .flow-caption .sep { color: var(--border); margin: 0 4px; display: inline-block; }
+  .flow-caption .sep { color: var(--teal); opacity: 0.7; margin: 0 4px; display: inline-block; }
   .flow-block[data-status="live"] .flow-caption { color: var(--text); }
 
   .flow-ring { width: 56px; height: 56px; cursor: default; }
@@ -332,7 +340,7 @@
   </header>
 
   <section class="hero">
-    <div class="eyebrow">DATA ENGINEER · BUILDING AGENTIC SYSTEMS</div>
+    <div class="eyebrow">DATA ENGINEER · AGENTIC SYSTEMS · SELF-HOSTED PLATFORM</div>
     <h1>Pipelines that <em>reason</em>, not just move data.</h1>
     <p class="lede">
       A working sandbox of agentic systems built on production data-engineering
@@ -350,19 +358,21 @@
 
     <div class="project">
       <div>
-        <div class="project-name">News Archive Agent</div>
+        <div class="project-name">GazetteAI</div>
         <div class="project-desc">
-          Agentic RAG over a historical news corpus — retrieves, grades its own
-          results, rewrites the query and retries when retrieval comes up empty,
-          then answers with cited sources.
+          Agentic RAG grounded in Wikipedia's Current Events Portal, updated daily —
+          grades its own retrieval, rewrites the query and retries when it comes up
+          empty, and overrides its own contradictory decisions with deterministic
+          guardrails before answering.
         </div>
-        <div class="project-stack">Ollama · LlamaIndex · ChromaDB · Streamlit</div>
+        <div class="project-stack">Ollama · LangGraph · ChromaDB · Streamlit</div>
+        <div class="project-note">runs locally — not yet publicly deployed</div>
       </div>
       <div class="project-side">
         <div class="status live">LIVE</div>
         <div class="flow-block" data-status="live">
-          <svg class="flow-ring" data-status="live" data-stages="Dataset,Chunk+Embed,Vector Store,Agentic Loop,Answer" viewBox="0 0 56 56"></svg>
-          <div class="flow-caption">Dataset<span class="sep">·</span>Embed<span class="sep">·</span>Vectors<span class="sep">·</span>Agent Loop<span class="sep">·</span>Answer</div>
+          <svg class="flow-ring" data-status="live" data-stages="Current Events,Chunk+Embed,Vector Store,Agentic Loop,Answer" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Current Events<span class="sep">·</span>Embed<span class="sep">·</span>Vectors<span class="sep">·</span>Agent Loop<span class="sep">·</span>Answer</div>
         </div>
       </div>
     </div>
@@ -428,6 +438,34 @@
       </div>
     </div>
 
+  </div>
+
+  <div class="section-label">
+    <span>Infrastructure</span>
+    <span>Status</span>
+  </div>
+
+  <div class="projects">
+    <div class="project">
+      <div>
+        <div class="project-name">Self-hosted platform, Oracle Cloud</div>
+        <div class="project-desc">
+          Provisioned and hardened an ARM VM from scratch to run the stack above
+          on a schedule, independent of any laptop being on: a local LLM server,
+          a workflow orchestrator, and a headless browser runtime, each configured
+          and verified end to end. Two-layer firewall (cloud security list +
+          host-level iptables) opened deliberately, port by port.
+        </div>
+        <div class="project-stack">Oracle Cloud (Ampere A1) · Ollama · n8n · Docker · Playwright · Ubuntu</div>
+      </div>
+      <div class="project-side">
+        <div class="status live">LIVE</div>
+        <div class="flow-block" data-status="live">
+          <svg class="flow-ring" data-status="live" data-stages="Provision VM,Harden + Firewall,Install Runtime,Deploy Services" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Provision<span class="sep">·</span>Harden<span class="sep">·</span>Runtime<span class="sep">·</span>Deploy</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <footer>
