@@ -1,0 +1,11 @@
+=== Facts ===
+Trades: 352 (~2.0/day)
+Average trade duration: 6.0 hours
+Win rate: 23.01%
+Strategy return: -64.08%
+Buy & hold return: -27.41%
+Commissions paid: $46,020,095
+Sharpe ratio: -22.49
+
+=== Interpretation ===
+The strategy did not work as evidenced by a negative Sharpe ratio, indicating that it performed worse than buy-and-hold over the tested period. The frequent trading (2.0 trades per day) likely contributed to high commission costs, which significantly eroded returns despite having a win rate of only 23%. Given the long average trade duration of about 6 hours, the strategy appears to have generated clustered signals rather than independent ones; it suggests there may be repetitive or possibly flawed trading patterns.
