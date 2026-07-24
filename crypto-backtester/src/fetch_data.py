@@ -1,44 +1,55 @@
 import requests
 import pandas as pd
-from datetime import datetime, timedelta, timezone
+import os
 
-def fetch_binance_klines(symbol="BTCUSDT", interval="15m", days_back=180):
-    url = "https://api.binance.com/api/v3/klines"
-    end_time = int(datetime.now(timezone.utc).timestamp() * 1000)
-    start_time = int((datetime.now(timezone.utc) - timedelta(days=days_back)).timestamp()*1000)
+MAIN_CSV = "btc_15m_180d.csv"
 
-    all_candles = []
-    current_start = start_time
 
-    while current_start < end_time:
-        params = {
-            "symbol": symbol,
-            "interval": interval,
-            "startTime": current_start,
-            "limit": 1000
-        }
-        response = requests.get(url, params=params, timeout=15)
-        data = response.json()
-        if not data:
-            break
-        all_candles.extend(data)
-        current_start = data[-1][6] + 1
-        print(f"    Fetched {len(all_candles)} candles so far...")
+def fetch_kraken_ohlc(pair="XBTUSD", interval=15):
+    """Kraken's public OHLC endpoint -- free, no API key, not geo-blocked
+    (unlike Binance, which blocks US-region IPs -- our Oracle VM is 
+    hosted in Ashburn, VA, so this is a hard requirement, not a preference).
+    Returns up to 720 most recent candles (7.5 days at 15m interval) --
+    no historical pagination available on this endpoint."""
+    url = "https://api.kraken.com/0/public/OHLC"
+    params = {"pair": pair, "interval": interval}
+    response = requests.get(url, params=params, timeout=15)
+    data = response.json()
 
-    df = pd.DataFrame(all_candles, columns=[
-        "open_time", "open", "high", "low", "close", "volume",
-        "close_time", "quote_volume", "trades",
-        "taker_buy_base", "taker_buy_quote", "ignore"
+    if data.get("error"):
+        raise Exception(f"Kraken API error: {data['error']}")
+
+    result_key = list(data["result"].keys())[0]
+    candles = data["result"][result_key]
+
+    df = pd.DataFrame(candles, columns=[
+        "time", "open", "high", "low", "close", "vwap", "volume", "count"
     ])
-    df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
+    df["open_time"] = pd.to_datetime(df["time"], unit="s")
     df[["open", "high", "low", "close", "volume"]] = df[["open", "high", "low", "close", "volume"]].astype(float)
     return df[["open_time", "open", "high", "low", "close", "volume"]]
 
-if __name__ == "__main__":
-    print("Fetching BTC 15-minute candles, last 180 days...")
-    df = fetch_binance_klines("BTCUSDT", "15m", 180)
-    df.to_csv("btc_15m_180d.csv", index=False)
-    print(f"\nSaved {len(df)} candles to btc_15m_180d.csv")
-    print(df.head())
-    print(df.tail())
 
+def merge_and_save(new_df):
+    """Append new candles onto existing history, deduping by timestamp,
+    so the dataset genuinely grows over time rather than staying a
+    fixed rolling window."""
+    if os.path.exists(MAIN_CSV):
+        existing = pd.read_csv(MAIN_CSV, parse_dates=["open_time"])
+        combined = pd.concat([existing, new_df])
+        combined = combined.drop_duplicates(subset="open_time", keep="last")
+        combined = combined.sort_values("open_time").reset_index(drop=True)
+    else:
+        combined = new_df
+
+    combined.to_csv(MAIN_CSV, index=False)
+    return len(combined)
+
+
+if __name__ == "__main__":
+    print("Fetching latest BTC 15-minute candles from Kraken...")
+    new_df = fetch_kraken_ohlc()
+    print(f"Fetched {len(new_df)} recent candles (up to {new_df['open_time'].max()})")
+
+    total = merge_and_save(new_df)
+    print(f"Merged into {MAIN_CSV}: {total} total candles now stored")
