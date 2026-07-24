@@ -366,7 +366,9 @@
           guardrails before answering.
         </div>
         <div class="project-stack">Ollama · LangGraph · ChromaDB · Streamlit</div>
-        <div class="project-note">runs locally — not yet publicly deployed</div>
+        <a class="project-link" href="http://150.136.235.72:8501" target="_blank" rel="noopener">
+          live chat — ask about current events
+        </a>
       </div>
       <div class="project-side">
         <div class="status live">LIVE</div>
@@ -388,7 +390,7 @@
         </div>
         <div class="project-stack">Playwright · Python · Streamlit</div>
         <a class="project-link" href="https://xxruruxx-calabarzon-listings.streamlit.app" target="_blank" rel="noopener">
-          live dashboard — 604 listings, filterable + mapped
+          live dashboard — filterable + mapped, auto-refreshed weekly
         </a>
       </div>
       <div class="project-side">
@@ -396,6 +398,32 @@
         <div class="flow-block" data-status="live">
           <svg class="flow-ring" data-status="live" data-stages="Filter Chain,Parallel Provinces,Decode Payload,Validate,Dashboard" viewBox="0 0 56 56"></svg>
           <div class="flow-caption">Filter Chain<span class="sep">·</span>Parallel<span class="sep">·</span>Decode<span class="sep">·</span>Validate<span class="sep">·</span>Dashboard</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="project">
+      <div>
+        <div class="project-name">Crypto Strategy Backtester</div>
+        <div class="project-desc">
+          Real historical BTC data, three interchangeable strategies (MA
+          crossover, RSI, combined), and an AI narration layer that's
+          structurally barred from misquoting its own numbers — facts are
+          computed in code, the model only interprets them. First real
+          finding: naive signal combination doesn't reduce trade frequency —
+          it can increase it, since the faster-moving signal ends up driving
+          exits.
+        </div>
+        <div class="project-stack">Python · backtesting.py · Binance API · Ollama</div>
+        <a class="project-link" href="http://150.136.235.72:8502" target="_blank" rel="noopener">
+          live dashboard — adjustable strategy parameters
+        </a>
+      </div>
+      <div class="project-side">
+        <div class="status live">LIVE</div>
+        <div class="flow-block" data-status="live">
+          <svg class="flow-ring" data-status="live" data-stages="Fetch OHLCV,Run Strategy,Compute Metrics,AI Interpret" viewBox="0 0 56 56"></svg>
+          <div class="flow-caption">Fetch OHLCV<span class="sep">·</span>Strategy<span class="sep">·</span>Metrics<span class="sep">·</span>AI Interpret</div>
         </div>
       </div>
     </div>
