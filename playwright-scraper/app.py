@@ -7,6 +7,14 @@ st.set_page_config(page_title="CALABARZON Listings", page_icon="🏠", layout="w
 st.title("Pag-IBIG Acquired Asset Listings")
 st.caption("CALABARZON region — scraped from the Online Public Auction platform")
 
+# Show when the data was last refreshed
+last_updated_path = os.path.join(os.path.dirname(__file__), "last_updated.txt")
+if os.path.exists(last_updated_path):
+    with open(last_updated_path) as f:
+        st.caption(f"📅 Last updated: {f.read().strip()}")
+else:
+    st.caption("📅 Last updated: not yet recorded")
+
 @st.cache_data
 def load_data():
     csv_path = os.path.join(os.path.dirname(__file__), "calabarzon_all_listings.csv")
