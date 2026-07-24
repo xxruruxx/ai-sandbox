@@ -25,8 +25,7 @@ def sma(values, n):
     return pd.Series(values).rolling(n).mean().to_numpy()
 
 
-@st.cache_data(show_spinner="Running backtest — this can take a minute on first load...")
-def run_backtest(_df, fast, slow):
+def run_backtest(df, fast, slow):
     class MACrossover(Strategy):
         fast_period = fast
         slow_period = slow
@@ -43,7 +42,7 @@ def run_backtest(_df, fast, slow):
                 if self.position:
                     self.position.close()
 
-    bt = Backtest(_df, MACrossover, cash=100_000_000, commission=0.001, finalize_trades=True)
+    bt = Backtest(df, MACrossover, cash=100_000_000, commission=0.001, finalize_trades=True)
     return bt.run(), bt
 
 
