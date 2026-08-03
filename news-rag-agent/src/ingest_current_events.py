@@ -5,13 +5,22 @@ from llama_index.core import Document, VectorStoreIndex, StorageContext, Setting
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
-from bs4 import BeautifulSoup
 import chromadb
+from bs4 import BeautifulSoup
 
 CHROMA_PATH = "./chroma_db"
 COLLECTION_NAME = "current_events_articles"
 USER_AGENT = "GazetteAI/1.0 (https://github.com/xxruruxx/ai-sandbox)"
 DAYS_TO_FETCH = 14
+
+IPTC_TOP_LEVEL = [
+    "arts, culture, entertainment and media", "conflict, war and peace",
+    "crime, law and justice", "disaster, accident and emergency incident",
+    "economy, business and finance", "education", "environment",
+    "health", "human interest", "labour", "lifestyle and leisure",
+    "politics", "religion", "science and technology", "society",
+    "sport", "weather"
+]
 
 
 def fetch_day_page_title(target_date):
@@ -21,6 +30,7 @@ def fetch_day_page_title(target_date):
     day = target_date.day
     year = target_date.year
     return f"Portal:Current events/{year} {month_name} {day}"
+
 
 def fetch_page_text(title):
     """Pull fully-rendered text for one Current Events Portal day-page.
@@ -53,6 +63,35 @@ def fetch_page_text(title):
     soup = BeautifulSoup(html, "html.parser")
     text = soup.get_text(separator="\n", strip=True)
     return text
+
+
+def generate_tags(text):
+    """Classify content against IPTC Media Topics' 17 top-level categories --
+    the real industry-standard taxonomy used by AP/Reuters/AFP -- rather than
+    free-form tag generation, which drifts in wording across days
+    (e.g. "Iran Conflict" vs "Middle East Tensions" for the same topic)."""
+    categories_list = "\n".join(f"- {c}" for c in IPTC_TOP_LEVEL)
+    prompt = f"""Read this news summary and select the 1-2 MOST relevant 
+categories from this exact list (use the exact wording given):
+
+{categories_list}
+
+Text:
+{text[:2000]}
+
+Respond with ONLY the selected category name(s), comma-separated, exactly 
+as written above. Nothing else."""
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
+            timeout=60
+        )
+        tags = response.json()["response"].strip()
+        return tags
+    except Exception:
+        return ""
 
 
 def get_existing_ids(chroma_collection):
@@ -96,6 +135,9 @@ def main():
             print(f"    (no content found for this date, skipping)")
             continue
 
+        tags = generate_tags(text)
+        print(f"    Tags: {tags}")
+
         new_documents.append(
             Document(
                 text=text,
@@ -105,6 +147,7 @@ def main():
                     "date": target_date.isoformat(),
                     "link": f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
                     "source": "wikipedia_current_events",
+                    "tags": tags,
                 },
             )
         )
