@@ -94,6 +94,30 @@ as written above. Nothing else."""
         return ""
 
 
+def generate_headline(text):
+    """A short, specific one-line summary of the day's actual main story --
+    complements the broad IPTC category with something concrete enough to
+    click into or ask about."""
+    prompt = f"""Read this news summary and write ONE short headline (under 
+12 words) capturing the single most significant story of the day. Be 
+specific -- name actual places/events/people mentioned, not a vague category.
+
+Text:
+{text[:2000]}
+
+Respond with ONLY the headline, nothing else."""
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
+            timeout=60
+        )
+        return response.json()["response"].strip()
+    except Exception:
+        return ""
+    
+
 def get_existing_ids(chroma_collection):
     try:
         existing = chroma_collection.get(include=[])
@@ -136,7 +160,8 @@ def main():
             continue
 
         tags = generate_tags(text)
-        print(f"    Tags: {tags}")
+        headline = generate_headline(text)
+        print(f"    Tags: {tags} | Headline: {headline}")
 
         new_documents.append(
             Document(
@@ -148,6 +173,7 @@ def main():
                     "link": f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
                     "source": "wikipedia_current_events",
                     "tags": tags,
+                    "headline": headline,
                 },
             )
         )
