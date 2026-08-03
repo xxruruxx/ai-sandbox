@@ -21,20 +21,21 @@ def get_recent_coverage():
         date = meta.get("date")
         link = meta.get("link")
         tags = meta.get("tags", "")
-        headlines = meta.get("headlines", "")
+        section = meta.get("section", "")
+        headline = meta.get("headline", "")
         if not date:
             continue
 
         if date not in dates_seen:
-            dates_seen[date] = {"link": link, "tags": tags, "headlines": headlines}
-        else:
-            existing = dates_seen[date]
-            if tags and not existing["tags"]:
-                existing["tags"] = tags
-            if headlines and not existing["headlines"]:
-                existing["headlines"] = headlines
-            if link and not existing["link"]:
-                existing["link"] = link
+            dates_seen[date] = {"link": link, "tags": tags, "headlines": []}
+
+        if headline:
+            entry = f"[{section}] {headline}"
+            if entry not in dates_seen[date]["headlines"]:
+                dates_seen[date]["headlines"].append(entry)
+
+        if tags and not dates_seen[date]["tags"]:
+            dates_seen[date]["tags"] = tags
 
     sorted_dates = sorted(dates_seen.keys(), reverse=True)
     return sorted_dates, dates_seen
@@ -54,12 +55,12 @@ with st.sidebar:
         st.markdown("**Recent topics:**")
         for date in recent_dates[:10]:
             info = date_info[date]
-            headlines_str = info.get("headlines", "")
+            headlines_list = info.get("headlines", [])
             tags_display = info["tags"] if info["tags"] else ""
 
             st.markdown(f"**{date}**")
-            if headlines_str:
-                for h in headlines_str.split(" | "):
+            if headlines_list:
+                for h in headlines_list:
                     st.caption(f"• {h}")
             else:
                 st.caption("_(no headlines yet)_")
