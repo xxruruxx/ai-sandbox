@@ -1,6 +1,7 @@
 ﻿import streamlit as st
 import pandas as pd
 import os
+from city_province_map import CITY_TO_PROVINCE
 
 st.set_page_config(page_title="CALABARZON Listings", page_icon="🏠", layout="wide")
 
@@ -15,12 +16,12 @@ if os.path.exists(last_updated_path):
 else:
     st.caption("📅 Last updated: not yet recorded")
 
+
 @st.cache_data
 def load_data():
     csv_path = os.path.join(os.path.dirname(__file__), "calabarzon_all_listings.csv")
     df = pd.read_csv(csv_path)
 
-    # Parse GPS coordinates out of ins_remarks (format: "lat, lng")
     def parse_coords(val):
         try:
             lat, lon = str(val).split(",")
@@ -36,11 +37,29 @@ def load_data():
 
 df = load_data()
 
+# --- Read URL parameters from Telegram bot links ---
+query_params = st.query_params
+url_province = query_params.get("province", None)
+url_sort = query_params.get("sort", None)
+
+if url_province:
+    st.info(f"🔗 Filtered from Telegram link — showing **{url_province}** province")
+
 # --- Sidebar filters ---
 st.sidebar.header("Filters")
 
 provinces = sorted(df["city_searched"].dropna().unique())
-selected_city = st.sidebar.multiselect("City / Municipality", provinces, default=provinces)
+
+# If a province came from a Telegram link, pre-select only that
+# province's cities; otherwise default to showing everything
+if url_province:
+    default_cities = [c for c in provinces if CITY_TO_PROVINCE.get(c) == url_province]
+    if not default_cities:  # fallback if the province name didn't match anything
+        default_cities = provinces
+else:
+    default_cities = provinces
+
+selected_city = st.sidebar.multiselect("City / Municipality", provinces, default=default_cities)
 
 prop_types = sorted(df["prop_type"].dropna().unique())
 selected_type = st.sidebar.multiselect("Property Type", prop_types, default=prop_types)
@@ -60,6 +79,12 @@ filtered = df[
     df["min_sellprice"].between(price_range[0], price_range[1])
 ]
 
+# Apply sort from Telegram link, if present
+if url_sort == "price_asc":
+    filtered = filtered.sort_values("min_sellprice", ascending=True)
+else:
+    filtered = filtered.sort_values("min_sellprice")
+
 st.write(f"**{len(filtered)}** listings match your filters (out of {len(df)} total)")
 
 # --- Table view ---
@@ -68,7 +93,7 @@ display_cols = [
     "min_sellprice", "lot_area", "floor_area", "city_searched", "disposal_type"
 ]
 st.dataframe(
-    filtered[display_cols].sort_values("min_sellprice"),
+    filtered[display_cols],
     use_container_width=True,
     hide_index=True
 )
