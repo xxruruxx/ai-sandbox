@@ -1,5 +1,6 @@
 import requests
 import time
+import re
 from datetime import date, timedelta
 from llama_index.core import Document, VectorStoreIndex, StorageContext, Settings
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -22,10 +23,17 @@ IPTC_TOP_LEVEL = [
     "sport", "weather"
 ]
 
+# Real, recurring section names used by Wikipedia's Current Events Portal
+KNOWN_SECTIONS = [
+    "Armed conflicts and attacks", "Arts and culture",
+    "Business and economy", "Disasters and accidents",
+    "Health and environment", "International relations",
+    "Law and crime", "Politics and elections", "Science and technology",
+    "Sports", "Deaths"
+]
+
 
 def fetch_day_page_title(target_date):
-    """Wikipedia's Current Events Portal uses dated sub-pages like
-    'Portal:Current events/2026 July 17'."""
     month_name = target_date.strftime("%B")
     day = target_date.day
     year = target_date.year
@@ -35,8 +43,7 @@ def fetch_day_page_title(target_date):
 def fetch_page_text(title):
     """Pull fully-rendered text for one Current Events Portal day-page.
     Uses action=parse (not the extracts API) because these pages are
-    built almost entirely from transcluded templates -- the extracts
-    API can't see through transclusion and returns empty content."""
+    built almost entirely from transcluded templates."""
     headers = {"User-Agent": USER_AGENT}
     params = {
         "action": "parse",
@@ -65,11 +72,29 @@ def fetch_page_text(title):
     return text
 
 
+def split_into_sections(text):
+    """Split raw page text into its actual named sections (Armed conflicts,
+    Disasters, Sports, etc.) instead of blindly truncating by character
+    count -- guarantees later sections aren't silently cut off just because
+    an earlier section (usually Armed conflicts) runs long."""
+    pattern = "|".join(re.escape(s) for s in KNOWN_SECTIONS)
+    parts = re.split(f"({pattern})", text)
+
+    sections = {}
+    current_section = "General"
+    for part in parts:
+        part = part.strip()
+        if part in KNOWN_SECTIONS:
+            current_section = part
+        elif part:
+            sections.setdefault(current_section, "")
+            sections[current_section] += part + "\n"
+
+    return sections
+
+
 def generate_tags(text):
-    """Classify content against IPTC Media Topics' 17 top-level categories --
-    the real industry-standard taxonomy used by AP/Reuters/AFP -- rather than
-    free-form tag generation, which drifts in wording across days
-    (e.g. "Iran Conflict" vs "Middle East Tensions" for the same topic)."""
+    """Classify content against IPTC Media Topics' 17 top-level categories."""
     categories_list = "\n".join(f"- {c}" for c in IPTC_TOP_LEVEL)
     prompt = f"""Read this news summary and select the 1-2 MOST relevant 
 categories from this exact list (use the exact wording given):
@@ -88,28 +113,22 @@ as written above. Nothing else."""
             json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
             timeout=60
         )
-        tags = response.json()["response"].strip()
-        return tags
+        return response.json()["response"].strip()
     except Exception:
         return ""
 
 
-def generate_headlines(text):
-    """3-4 short headlines capturing the day's real spread of stories --
-    a single headline understates how much is actually in a typical day's
-    coverage (conflict, disaster, politics, health, etc. often all present)."""
-
-    if len(text.strip()) < 200:
-        return []  # too little real content to safely summarize
-
+def generate_headlines_fallback(text):
+    """Used only if section-splitting fails to find any known sections
+    (e.g. an unusual page structure) -- old character-limit approach as
+    a safety net, not the primary method."""
     prompt = f"""Read this news summary and write UP TO 4 short headlines 
-(each under 12 words) covering the DIFFERENT major stories of the day -- 
-not just the top one. Be specific -- name actual places/events/people 
-ACTUALLY MENTIONED in the text below. If the text only contains one story, 
-return only one headline. Do NOT invent stories not present in the text.
+(each under 12 words) covering DIFFERENT major stories. Be specific. Do 
+NOT invent anything not present in the text.
 
 Text:
-{text[:3000]}
+{text[:4000]}
+
 Respond with ONLY the headlines, one per line, nothing else."""
 
     try:
@@ -119,12 +138,50 @@ Respond with ONLY the headlines, one per line, nothing else."""
             timeout=90
         )
         headlines_raw = response.json()["response"].strip()
-        # Split into a clean list, one per line
-        headlines = [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()]
-        return headlines[:4]  # cap at 4 even if the model gives more
+        return [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()][:4]
     except Exception:
         return []
-    
+
+
+def generate_headlines(text):
+    """One headline PER REAL SECTION FOUND that day -- guarantees coverage
+    proportional to what actually happened, not an arbitrary fixed count
+    or a character-limit guess that silently drops later sections."""
+    if len(text.strip()) < 200:
+        return []
+
+    sections = split_into_sections(text)
+
+    if not sections or len(sections) <= 1:
+        return generate_headlines_fallback(text)
+
+    section_summaries = "\n\n".join(
+        f"=== {name} ===\n{content[:800]}" for name, content in sections.items()
+    )
+
+    prompt = f"""Below is a day's news, already split into its real sections.
+
+For EACH section shown, write exactly ONE short headline (under 12 words) 
+covering that section's most significant story. Be specific -- name actual 
+places/events/people ACTUALLY MENTIONED. Do NOT invent anything not present.
+
+{section_summaries}
+
+Respond with ONLY the headlines, one per line, in the format:
+[Section Name]: headline text"""
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
+            timeout=90
+        )
+        headlines_raw = response.json()["response"].strip()
+        headlines = [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()]
+        return headlines[:8]  # section-driven, so allow more than the old fixed 4
+    except Exception:
+        return []
+
 
 def get_existing_ids(chroma_collection):
     try:
@@ -170,7 +227,8 @@ def main():
         tags = generate_tags(text)
         headlines = generate_headlines(text)
         headlines_str = " | ".join(headlines)
-        print(f"    Tags: {tags} | Headline: {headlines_str}")
+        print(f"    Tags: {tags}")
+        print(f"    Headlines ({len(headlines)}): {headlines_str}")
 
         new_documents.append(
             Document(
