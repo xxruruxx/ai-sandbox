@@ -19,7 +19,7 @@ chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 chroma_collection = chroma_client.get_or_create_collection(COLLECTION_NAME)
 vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 index = VectorStoreIndex.from_vector_store(vector_store)
-retriever = index.as_retriever(similarity_top_k=3)
+retriever = index.as_retriever(similarity_top_k=6)
 
 
 # ---- Agent state: what flows through the graph ----
