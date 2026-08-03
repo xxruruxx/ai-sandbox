@@ -155,20 +155,24 @@ def generate_headlines(text):
     if not sections or len(sections) <= 1:
         return generate_headlines_fallback(text)
 
+    section_names = list(sections.keys())
     section_summaries = "\n\n".join(
-        f"=== {name} ===\n{content[:800]}" for name, content in sections.items()
+        f"SECTION {i+1}: {name}\n{content[:800]}"
+        for i, (name, content) in enumerate(sections.items())
     )
 
-    prompt = f"""Below is a day's news, already split into its real sections.
+    prompt = f"""Below is a day's news, already split into {len(sections)} 
+numbered sections.
 
-For EACH section shown, write exactly ONE short headline (under 12 words) 
+For EACH numbered section, write exactly ONE short headline (under 12 words) 
 covering that section's most significant story. Be specific -- name actual 
 places/events/people ACTUALLY MENTIONED. Do NOT invent anything not present.
 
 {section_summaries}
 
-Respond with ONLY the headlines, one per line, in the format:
-[Section Name]: headline text"""
+Respond with ONLY {len(sections)} headlines, one per line, in the SAME 
+ORDER as the sections above. Do NOT repeat the section name or number --
+just the headline text itself, nothing else."""
 
     try:
         response = requests.post(
@@ -177,8 +181,18 @@ Respond with ONLY the headlines, one per line, in the format:
             timeout=90
         )
         headlines_raw = response.json()["response"].strip()
-        headlines = [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()]
-        return headlines[:8]  # section-driven, so allow more than the old fixed 4
+        raw_lines = [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()]
+
+        # Zip our OWN known-correct section names with the model's headline
+        # text -- we never trust the model to retype the section name itself
+        headlines = []
+        for i, headline_text in enumerate(raw_lines):
+            if i < len(section_names):
+                headlines.append(f"[{section_names[i]}] {headline_text}")
+            else:
+                headlines.append(headline_text)
+
+        return headlines[:8]
     except Exception:
         return []
 
