@@ -38,6 +38,7 @@ class AgentState(TypedDict):
 # ---- Nodes ----
 
 def retrieve_node(state: AgentState) -> AgentState:
+    print(f"  [retrieve] searching for: \"{state['current_query']}\"")
     nodes = retriever.retrieve(state["current_query"])
     state["nodes"] = nodes
     return state
@@ -126,9 +127,16 @@ Respond ONLY as JSON: {{"action": "...", "reason": "..."}}"""
 def rewrite_node(state: AgentState) -> AgentState:
     prompt = f"""This search query found no relevant results: "{state['current_query']}"
 
-Rewrite it as a more specific query. Return ONLY the rewritten query."""
+The original question was: "{state['original_question']}"
+
+Rewrite the search query to be more specific, using ONLY terms and 
+concepts from the original question. Do NOT introduce new dates, years, 
+names, or details not mentioned in the original question.
+
+Return ONLY the rewritten query."""
     response = Settings.llm.complete(prompt)
     state["current_query"] = str(response).strip()
+    print(f"  [rewrite] new query: \"{state['current_query']}\"")
     state["attempts"] += 1
     return state
 
