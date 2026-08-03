@@ -24,8 +24,17 @@ def get_recent_coverage():
         headlines = meta.get("headlines", "")
         if not date:
             continue
-        if date not in dates_seen or (tags and not dates_seen[date]["tags"]):
+
+        if date not in dates_seen:
             dates_seen[date] = {"link": link, "tags": tags, "headlines": headlines}
+        else:
+            existing = dates_seen[date]
+            if tags and not existing["tags"]:
+                existing["tags"] = tags
+            if headlines and not existing["headlines"]:
+                existing["headlines"] = headlines
+            if link and not existing["link"]:
+                existing["link"] = link
 
     sorted_dates = sorted(dates_seen.keys(), reverse=True)
     return sorted_dates, dates_seen
