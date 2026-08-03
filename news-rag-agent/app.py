@@ -21,13 +21,11 @@ def get_recent_coverage():
         date = meta.get("date")
         link = meta.get("link")
         tags = meta.get("tags", "")
+        headlines = meta.get("headlines", "")
         if not date:
             continue
-        # Prefer a chunk that actually has tags over one that doesn't --
-        # each day is split into ~18 chunks, all sharing the same metadata,
-        # but older (pre-tagging) chunks may still exist alongside new ones
         if date not in dates_seen or (tags and not dates_seen[date]["tags"]):
-            dates_seen[date] = {"link": link, "tags": tags, "headline": meta.get("headline", "")}
+            dates_seen[date] = {"link": link, "tags": tags, "headlines": headlines}
 
     sorted_dates = sorted(dates_seen.keys(), reverse=True)
     return sorted_dates, dates_seen
@@ -35,8 +33,6 @@ def get_recent_coverage():
 
 
 st.set_page_config(page_title="GazetteAI", page_icon="📰")
-
-recent_dates, date_info = get_recent_coverage()
 
 recent_dates, date_info = get_recent_coverage()
 
@@ -49,11 +45,15 @@ with st.sidebar:
         st.markdown("**Recent topics:**")
         for date in recent_dates[:10]:
             info = date_info[date]
-            headline = info.get("headline") or "_(no headline yet)_"
+            headlines_str = info.get("headlines", "")
             tags_display = info["tags"] if info["tags"] else ""
 
             st.markdown(f"**{date}**")
-            st.caption(f"{headline}")
+            if headlines_str:
+                for h in headlines_str.split(" | "):
+                    st.caption(f"• {h}")
+            else:
+                st.caption("_(no headlines yet)_")
             if tags_display:
                 st.caption(f"🏷️ {tags_display}")
             st.caption(f"[source]({info['link']})")

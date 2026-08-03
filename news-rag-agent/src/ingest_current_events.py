@@ -94,28 +94,32 @@ as written above. Nothing else."""
         return ""
 
 
-def generate_headline(text):
-    """A short, specific one-line summary of the day's actual main story --
-    complements the broad IPTC category with something concrete enough to
-    click into or ask about."""
-    prompt = f"""Read this news summary and write ONE short headline (under 
-12 words) capturing the single most significant story of the day. Be 
-specific -- name actual places/events/people mentioned, not a vague category.
+def generate_headlines(text):
+    """3-4 short headlines capturing the day's real spread of stories --
+    a single headline understates how much is actually in a typical day's
+    coverage (conflict, disaster, politics, health, etc. often all present)."""
+    prompt = f"""Read this news summary and write 3-4 short headlines 
+(each under 12 words) covering the DIFFERENT major stories of the day -- 
+not just the top one. Be specific -- name actual places/events/people, 
+not vague categories. Cover distinct topics, not variations of the same story.
 
 Text:
-{text[:2000]}
+{text[:3000]}
 
-Respond with ONLY the headline, nothing else."""
+Respond with ONLY the headlines, one per line, nothing else."""
 
     try:
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
-            timeout=60
+            timeout=90
         )
-        return response.json()["response"].strip()
+        headlines_raw = response.json()["response"].strip()
+        # Split into a clean list, one per line
+        headlines = [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()]
+        return headlines[:4]  # cap at 4 even if the model gives more
     except Exception:
-        return ""
+        return []
     
 
 def get_existing_ids(chroma_collection):
@@ -160,8 +164,9 @@ def main():
             continue
 
         tags = generate_tags(text)
-        headline = generate_headline(text)
-        print(f"    Tags: {tags} | Headline: {headline}")
+        headlines = generate_headlines(text)
+        headlines_str = " | ".join(headlines)
+        print(f"    Tags: {tags} | Headline: {headlines_str}")
 
         new_documents.append(
             Document(
@@ -173,7 +178,7 @@ def main():
                     "link": f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
                     "source": "wikipedia_current_events",
                     "tags": tags,
-                    "headline": headline,
+                    "headlines": headlines_str,
                 },
             )
         )
