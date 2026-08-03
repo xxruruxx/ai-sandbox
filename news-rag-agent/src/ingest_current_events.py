@@ -144,9 +144,9 @@ Respond with ONLY the headlines, one per line, nothing else."""
 
 
 def generate_headlines(text):
-    """One headline PER REAL SECTION FOUND that day -- guarantees coverage
-    proportional to what actually happened, not an arbitrary fixed count
-    or a character-limit guess that silently drops later sections."""
+    """One separate API call PER SECTION -- slower than one combined call,
+    but structurally guarantees the headline actually matches its section,
+    since there's no multi-item ordering for a small model to get wrong."""
     if len(text.strip()) < 200:
         return []
 
@@ -155,46 +155,35 @@ def generate_headlines(text):
     if not sections or len(sections) <= 1:
         return generate_headlines_fallback(text)
 
-    section_names = list(sections.keys())
-    section_summaries = "\n\n".join(
-        f"SECTION {i+1}: {name}\n{content[:800]}"
-        for i, (name, content) in enumerate(sections.items())
-    )
+    headlines = []
+    for name, content in sections.items():
+        if not content.strip():
+            continue
 
-    prompt = f"""Below is a day's news, already split into {len(sections)} 
-numbered sections.
+        prompt = f"""Read this news section and write ONE short headline 
+(under 12 words) covering its most significant story. Be specific -- name 
+actual places/events/people ACTUALLY MENTIONED. Do NOT invent anything not 
+present.
 
-For EACH numbered section, write exactly ONE short headline (under 12 words) 
-covering that section's most significant story. Be specific -- name actual 
-places/events/people ACTUALLY MENTIONED. Do NOT invent anything not present.
+Section: {name}
+Text:
+{content[:1000]}
 
-{section_summaries}
+Respond with ONLY the headline, nothing else."""
 
-Respond with ONLY {len(sections)} headlines, one per line, in the SAME 
-ORDER as the sections above. Do NOT repeat the section name or number --
-just the headline text itself, nothing else."""
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
+                timeout=60
+            )
+            headline_text = response.json()["response"].strip()
+            if headline_text:
+                headlines.append(f"[{name}] {headline_text}")
+        except Exception:
+            continue
 
-    try:
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
-            timeout=90
-        )
-        headlines_raw = response.json()["response"].strip()
-        raw_lines = [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()]
-
-        # Zip our OWN known-correct section names with the model's headline
-        # text -- we never trust the model to retype the section name itself
-        headlines = []
-        for i, headline_text in enumerate(raw_lines):
-            if i < len(section_names):
-                headlines.append(f"[{section_names[i]}] {headline_text}")
-            else:
-                headlines.append(headline_text)
-
-        return headlines[:8]
-    except Exception:
-        return []
+    return headlines[:8]
 
 
 def get_existing_ids(chroma_collection):
