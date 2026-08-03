@@ -5,7 +5,50 @@ import os
 sys.path.append(os.path.dirname(__file__))
 from src.langgraph_agent import app as agent_graph
 
+import chromadb
+
+CHROMA_PATH = "./chroma_db"
+COLLECTION_NAME = "current_events_articles"
+
+@st.cache_data(ttl=3600)
+def get_recent_coverage():
+    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    collection = client.get_collection(COLLECTION_NAME)
+    results = collection.get(include=["metadatas"])
+
+    dates_seen = {}
+    for meta in results["metadatas"]:
+        date = meta.get("date")
+        link = meta.get("link")
+        tags = meta.get("tags", "")
+        if date and date not in dates_seen:
+            dates_seen[date] = {"link": link, "tags": tags}
+
+    sorted_dates = sorted(dates_seen.keys(), reverse=True)
+    return sorted_dates, dates_seen
+
+
+
 st.set_page_config(page_title="GazetteAI", page_icon="📰")
+
+recent_dates, date_info = get_recent_coverage()
+
+with st.sidebar:
+    st.subheader("📅 Coverage")
+    if recent_dates:
+        st.caption(f"Last updated: {recent_dates[0]}")
+        st.caption(f"Archive spans {len(recent_dates)} days")
+
+        st.markdown("**Recent topics:**")
+        for date in recent_dates[:10]:
+            info = date_info[date]
+            tags_display = info["tags"] if info["tags"] else "_(no tags yet)_"
+            st.markdown(f"**{date}** — {tags_display}")
+            st.caption(f"[source]({info['link']})")
+    else:
+        st.caption("No data ingested yet")
+
+        
 
 st.title("GazetteAI")
 st.caption("Agentic news research — grounded in Wikipedia's Current Events Portal, updated daily")
