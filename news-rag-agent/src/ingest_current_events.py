@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 CHROMA_PATH = "./chroma_db"
 COLLECTION_NAME = "current_events_articles"
 USER_AGENT = "GazetteAI/1.0 (https://github.com/xxruruxx/ai-sandbox)"
-DAYS_TO_FETCH = 14
+DAYS_TO_FETCH = 30  # wider backfill since we're rebuilding from scratch
 
 IPTC_TOP_LEVEL = [
     "arts, culture, entertainment and media", "conflict, war and peace",
@@ -23,7 +23,6 @@ IPTC_TOP_LEVEL = [
     "sport", "weather"
 ]
 
-# Real, recurring section names used by Wikipedia's Current Events Portal
 KNOWN_SECTIONS = [
     "Armed conflicts and attacks", "Arts and culture",
     "Business and economy", "Disasters and accidents",
@@ -41,21 +40,11 @@ def fetch_day_page_title(target_date):
 
 
 def fetch_page_text(title):
-    """Pull fully-rendered text for one Current Events Portal day-page.
-    Uses action=parse (not the extracts API) because these pages are
-    built almost entirely from transcluded templates."""
     headers = {"User-Agent": USER_AGENT}
-    params = {
-        "action": "parse",
-        "page": title,
-        "prop": "text",
-        "format": "json",
-    }
+    params = {"action": "parse", "page": title, "prop": "text", "format": "json"}
     response = requests.get(
         "https://en.wikipedia.org/w/api.php",
-        params=params,
-        headers=headers,
-        timeout=15,
+        params=params, headers=headers, timeout=15,
     )
     response.raise_for_status()
     data = response.json()
@@ -68,15 +57,16 @@ def fetch_page_text(title):
         return None
 
     soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(separator="\n", strip=True)
-    return text
+    return soup.get_text(separator="\n", strip=True)
 
 
 def split_into_sections(text):
-    """Split raw page text into its actual named sections (Armed conflicts,
-    Disasters, Sports, etc.) instead of blindly truncating by character
-    count -- guarantees later sections aren't silently cut off just because
-    an earlier section (usually Armed conflicts) runs long."""
+    """Split raw page text into its real named sections -- this is now
+    used for CHUNKING itself (each section becomes its own embedded
+    Document), not just for headline generation. This directly fixes
+    dilution: a short but real story (e.g. a single-paragraph disaster
+    report) no longer gets buried inside a large multi-topic chunk
+    alongside unrelated conflict/politics content."""
     pattern = "|".join(re.escape(s) for s in KNOWN_SECTIONS)
     parts = re.split(f"({pattern})", text)
 
@@ -94,7 +84,6 @@ def split_into_sections(text):
 
 
 def generate_tags(text):
-    """Classify content against IPTC Media Topics' 17 top-level categories."""
     categories_list = "\n".join(f"- {c}" for c in IPTC_TOP_LEVEL)
     prompt = f"""Read this news summary and select the 1-2 MOST relevant 
 categories from this exact list (use the exact wording given):
@@ -118,72 +107,33 @@ as written above. Nothing else."""
         return ""
 
 
-def generate_headlines_fallback(text):
-    """Used only if section-splitting fails to find any known sections
-    (e.g. an unusual page structure) -- old character-limit approach as
-    a safety net, not the primary method."""
-    prompt = f"""Read this news summary and write UP TO 4 short headlines 
-(each under 12 words) covering DIFFERENT major stories. Be specific. Do 
-NOT invent anything not present in the text.
+def generate_section_headline(section_name, content):
+    """One headline for ONE section -- separate API call per section,
+    same as before, but now this section IS the actual embedded chunk,
+    not just a summary label on top of a larger diluted chunk."""
+    if len(content.strip()) < 100:
+        return None
 
-Text:
-{text[:4000]}
-
-Respond with ONLY the headlines, one per line, nothing else."""
-
-    try:
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
-            timeout=90
-        )
-        headlines_raw = response.json()["response"].strip()
-        return [h.strip("-• ").strip() for h in headlines_raw.split("\n") if h.strip()][:4]
-    except Exception:
-        return []
-
-
-def generate_headlines(text):
-    """One separate API call PER SECTION -- slower than one combined call,
-    but structurally guarantees the headline actually matches its section,
-    since there's no multi-item ordering for a small model to get wrong."""
-    if len(text.strip()) < 200:
-        return []
-
-    sections = split_into_sections(text)
-
-    if not sections or len(sections) <= 1:
-        return generate_headlines_fallback(text)
-
-    headlines = []
-    for name, content in sections.items():
-        if not content.strip():
-            continue
-
-        prompt = f"""Read this news section and write ONE short headline 
+    prompt = f"""Read this news section and write ONE short headline 
 (under 12 words) covering its most significant story. Be specific -- name 
 actual places/events/people ACTUALLY MENTIONED. Do NOT invent anything not 
 present.
 
-Section: {name}
+Section: {section_name}
 Text:
 {content[:1000]}
 
 Respond with ONLY the headline, nothing else."""
 
-        try:
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
-                timeout=60
-            )
-            headline_text = response.json()["response"].strip()
-            if headline_text:
-                headlines.append(f"[{name}] {headline_text}")
-        except Exception:
-            continue
-
-    return headlines[:8]
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "qwen2.5:3b", "prompt": prompt, "stream": False},
+            timeout=60
+        )
+        return response.json()["response"].strip()
+    except Exception:
+        return None
 
 
 def get_existing_ids(chroma_collection):
@@ -206,7 +156,7 @@ def main():
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     existing_ids = get_existing_ids(chroma_collection)
-    print(f"Existing day-pages already in store: {len(existing_ids)}")
+    print(f"Existing chunks already in store: {len(existing_ids)}")
 
     new_documents = []
     today = date.today()
@@ -214,49 +164,64 @@ def main():
     for days_back in range(DAYS_TO_FETCH):
         target_date = today - timedelta(days=days_back)
         title = fetch_day_page_title(target_date)
-        doc_id = f"current_events_{target_date.isoformat()}"
+        date_str = target_date.isoformat()
 
-        if doc_id in existing_ids:
+        # Check if we've already ingested THIS DATE (any section) --
+        # skip the whole day if so, since sections are ingested together
+        day_prefix = f"current_events_{date_str}_"
+        if any(eid.startswith(day_prefix) for eid in existing_ids):
             continue
 
         print(f"  Fetching: {title}")
         text = fetch_page_text(title)
         time.sleep(1)
 
-        if not text or not text.strip():
-            print(f"    (no content found for this date, skipping)")
+        if not text or len(text.strip()) < 200:
+            print(f"    (no real content found for this date, skipping)")
             continue
 
         tags = generate_tags(text)
-        headlines = generate_headlines(text)
-        headlines_str = " | ".join(headlines)
-        print(f"    Tags: {tags}")
-        print(f"    Headlines ({len(headlines)}): {headlines_str}")
+        sections = split_into_sections(text)
 
-        new_documents.append(
-            Document(
-                text=text,
-                doc_id=doc_id,
-                metadata={
-                    "title": title,
-                    "date": target_date.isoformat(),
-                    "link": f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
-                    "source": "wikipedia_current_events",
-                    "tags": tags,
-                    "headlines": headlines_str,
-                },
+        day_had_real_section = False
+        for section_name, content in sections.items():
+            content = content.strip()
+            if len(content) < 100:
+                continue  # skip thin/boilerplate sections like bare "General"
+
+            headline = generate_section_headline(section_name, content)
+            section_slug = re.sub(r'[^a-z0-9]+', '-', section_name.lower()).strip('-')
+            doc_id = f"current_events_{date_str}_{section_slug}"
+
+            print(f"    [{section_name}] {headline}")
+            day_had_real_section = True
+
+            new_documents.append(
+                Document(
+                    text=content,
+                    doc_id=doc_id,
+                    metadata={
+                        "date": date_str,
+                        "section": section_name,
+                        "headline": headline or "",
+                        "tags": tags,
+                        "link": f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
+                        "source": "wikipedia_current_events",
+                    },
+                )
             )
-        )
+
+        if not day_had_real_section:
+            print(f"    (no sections met the content threshold, skipping day)")
 
     if not new_documents:
-        print("No new day-pages to add. Store is already up to date.")
+        print("No new chunks to add. Store is already up to date.")
         return
 
-    print(f"Embedding and storing {len(new_documents)} new day-pages...")
+    print(f"Embedding and storing {len(new_documents)} new section-chunks...")
     VectorStoreIndex.from_documents(new_documents, storage_context=storage_context)
 
-    print(f"Done. {len(new_documents)} new day-pages added. "
-          f"Total in store: {len(existing_ids) + len(new_documents)}")
+    print(f"Done. {len(new_documents)} new chunks added.")
 
 
 if __name__ == "__main__":
