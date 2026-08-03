@@ -98,14 +98,18 @@ def generate_headlines(text):
     """3-4 short headlines capturing the day's real spread of stories --
     a single headline understates how much is actually in a typical day's
     coverage (conflict, disaster, politics, health, etc. often all present)."""
-    prompt = f"""Read this news summary and write 3-4 short headlines 
+
+    if len(text.strip()) < 200:
+        return []  # too little real content to safely summarize
+
+    prompt = f"""Read this news summary and write UP TO 4 short headlines 
 (each under 12 words) covering the DIFFERENT major stories of the day -- 
-not just the top one. Be specific -- name actual places/events/people, 
-not vague categories. Cover distinct topics, not variations of the same story.
+not just the top one. Be specific -- name actual places/events/people 
+ACTUALLY MENTIONED in the text below. If the text only contains one story, 
+return only one headline. Do NOT invent stories not present in the text.
 
 Text:
 {text[:3000]}
-
 Respond with ONLY the headlines, one per line, nothing else."""
 
     try:
