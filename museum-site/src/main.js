@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { IrisRing } from './structures/IrisRing.js';
+import { EmberField } from './mechanisms/EmberField.js';
+import { VerdictNodes } from './mechanisms/VerdictNodes.js';
 
 // ============ SCENE ============
 const scene = new THREE.Scene();
@@ -34,6 +36,23 @@ const irisRing = new IrisRing({
   openDistance: 6,
 });
 irisRing.addTo(scene);
+
+// ============ EMBERS (M2-A) — Step 1 of room integration ============
+const embers = new EmberField({
+  position: new THREE.Vector3(0, 0, -10),
+  radius: 3.5,
+  zLength: 12,
+});
+embers.addTo(scene);
+
+// ============ VERDICT NODES ============
+const verdictNodes = new VerdictNodes({
+  count: 6,
+  roomZStart: -11,
+  roomLength: 6,
+});
+verdictNodes.addTo(scene);
+verdictNodes.demoRandomCycle();
 
 // ============ LIGHTING ============
 const ambient = new THREE.AmbientLight(0x404040, 1.5);
@@ -104,6 +123,8 @@ function animate() {
   }
 
   irisRing.update(delta, camera.position);
+  embers.update(delta);
+  verdictNodes.update(delta);
 
   renderer.render(scene, camera);
 }
