@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { IrisRing } from './structures/IrisRing.js';
 import { EmberField } from './mechanisms/EmberField.js';
 import { VerdictNodes } from './mechanisms/VerdictNodes.js';
+import { GravityWell } from './mechanisms/GravityWell.js';
 
 // ============ SCENE ============
 const scene = new THREE.Scene();
@@ -10,7 +11,7 @@ scene.fog = new THREE.Fog(0x050708, 5, 40);
 
 // ============ CAMERA ============
 const camera = new THREE.PerspectiveCamera(
-  70,
+  90,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
@@ -37,7 +38,7 @@ const irisRing = new IrisRing({
 });
 irisRing.addTo(scene);
 
-// ============ EMBERS (M2-A) — Step 1 of room integration ============
+// ============ EMBERS (M2-A) ============
 const embers = new EmberField({
   position: new THREE.Vector3(0, 0, -10),
   radius: 3.5,
@@ -49,10 +50,16 @@ embers.addTo(scene);
 const verdictNodes = new VerdictNodes({
   count: 6,
   roomZStart: -11,
-  roomLength: 6,
+  roomLength: 8, // was 6 — expanding the tunnel's depth
 });
 verdictNodes.addTo(scene);
 verdictNodes.demoRandomCycle();
+
+// ============ GRAVITY WELL ============
+const gravityWell = new GravityWell({
+  position: new THREE.Vector3(0, 1.6, -24), // was -14 — pushed further back, clear of the verdict nodes now that the tunnel is longer
+});
+gravityWell.addTo(scene);
 
 // ============ LIGHTING ============
 const ambient = new THREE.AmbientLight(0x404040, 1.5);
@@ -125,6 +132,7 @@ function animate() {
   irisRing.update(delta, camera.position);
   embers.update(delta);
   verdictNodes.update(delta);
+  gravityWell.update(delta, camera.position);
 
   renderer.render(scene, camera);
 }
