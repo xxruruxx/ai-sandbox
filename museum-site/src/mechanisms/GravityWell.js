@@ -4,7 +4,7 @@ import { COLORS } from '../utils/constants.js';
 /**
  * GravityWell — M1-C "Visitor as Gravity Well".
  *
- * Spacebar is a ONE-SHOT trigger, not a toggle: press it once to start a
+ * Press V (a ONE-SHOT trigger, not a toggle) to start a
  * pull-in event. Particles travel toward the visitor, and each one that
  * arrives FREEZES and fades to true invisibility (not just dimmed) —
  * "consumed" by the search, like a matched result being resolved. Once
@@ -100,7 +100,7 @@ export class GravityWell {
 
     this._nearEnough = false;
     document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && this._nearEnough && this.phase === 'idle') {
+      if (e.key.toLowerCase() === 'v' && this._nearEnough && this.phase === 'idle') {
         this._startPull();
       }
     });
