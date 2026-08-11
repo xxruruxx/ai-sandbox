@@ -1,8 +1,5 @@
 import * as THREE from 'three';
-import { IrisRing } from './structures/IrisRing.js';
-import { EmberField } from './mechanisms/EmberField.js';
-import { VerdictNodes } from './mechanisms/VerdictNodes.js';
-import { GravityWell } from './mechanisms/GravityWell.js';
+import { GazetteAIRoom } from './rooms/GazetteAIRoom.js';
 import { TransitionRoom } from './rooms/TransitionRoom.js';
 
 // ============ SCENE ============
@@ -27,45 +24,23 @@ document.body.appendChild(renderer.domElement);
 
 // ============ REFERENCE GRID ============
 const grid = new THREE.GridHelper(120, 120, 0x2a3a48, 0x1c2530);
-grid.position.z = -40; // shift it to center over the tunnel's actual length, not just around the origin
+grid.position.z = -40;
 scene.add(grid);
 
-// ============ IRIS RING ============
-const irisRing = new IrisRing({
-  leafCount: 5,
-  radius: 3.0,
+// ============ ROOMS — this is the pattern for adding future projects ============
+// Each room owns its own door(s) and content. To add a new project room later,
+// just instantiate it with a position further down the tunnel (more negative Z)
+// than wherever the previous room ends, then call .addTo(scene) and include it
+// in the update loop below. No other files need to change.
+
+const gazetteRoom = new GazetteAIRoom({
   position: new THREE.Vector3(0, 2.0, -10),
-  previewDistance: 8,
-  openDistance: 6,
 });
-irisRing.addTo(scene);
+gazetteRoom.addTo(scene);
+gazetteRoom.startDemoData(); // TODO: replace with real grade_node integration later
 
-// ============ EMBERS (M2-A) ============
-const embers = new EmberField({
-  position: new THREE.Vector3(0, 0, -10),
-  radius: 3.5,
-  zLength: 12,
-});
-embers.addTo(scene);
-
-// ============ VERDICT NODES ============
-const verdictNodes = new VerdictNodes({
-  count: 6,
-  roomZStart: -11,
-  roomLength: 8, // was 6 — expanding the tunnel's depth
-});
-verdictNodes.addTo(scene);
-verdictNodes.demoRandomCycle();
-
-// ============ GRAVITY WELL ============
-const gravityWell = new GravityWell({
-  position: new THREE.Vector3(0, 1.6, -24), // was -14 — pushed further back, clear of the verdict nodes now that the tunnel is longer
-});
-gravityWell.addTo(scene);
-
-// ============ TRANSITION ROOM ============
 const transitionRoom = new TransitionRoom({
-  position: new THREE.Vector3(0, 2.0, -30), // entry point — past your gravity well at -24
+  position: new THREE.Vector3(0, 2.0, -30),
   length: 4,
 });
 transitionRoom.addTo(scene);
@@ -112,14 +87,20 @@ document.addEventListener('keyup', (e) => {
 const moveSpeed = 4;
 const clock = new THREE.Clock();
 
-// === Sitting ===
+// ============ RUNNING ============
 let isRunning = false;
-let isSeated = false;
-let standingPosition = new THREE.Vector3();
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Shift') isRunning = true;
+});
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Shift') isRunning = false;
+});
+
+// ============ JUMPING ============
 let verticalVelocity = 0;
 const gravity = -18;
 const jumpStrength = 6;
-const groundY = 1.7; // matches your camera's starting height
+const groundY = 1.7;
 
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !isSeated && camera.position.y <= groundY + 0.01) {
@@ -127,12 +108,9 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Shift') isRunning = true;
-})
-document.addEventListener('keyup', (e) => {
-  if (e.key === 'Shift') isRunning = false;
-})
+// ============ SITTING ============
+let isSeated = false;
+let standingPosition = new THREE.Vector3();
 
 document.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() !== 'e') return;
@@ -150,7 +128,6 @@ document.addEventListener('keydown', (e) => {
     isSeated = false;
   }
 });
-
 
 // ============ RENDER LOOP ============
 function animate() {
@@ -179,9 +156,7 @@ function animate() {
       moveDir.normalize().multiplyScalar(currentSpeed * delta);
       camera.position.add(moveDir);
     }
-  }
 
-  if (!isSeated) {
     verticalVelocity += gravity * delta;
     camera.position.y += verticalVelocity * delta;
     if (camera.position.y < groundY) {
@@ -190,11 +165,7 @@ function animate() {
     }
   }
 
-  
-  irisRing.update(delta, camera.position);
-  embers.update(delta);
-  verdictNodes.update(delta);
-  gravityWell.update(delta, camera.position);
+  gazetteRoom.update(delta, camera.position);
   transitionRoom.update(delta, camera.position);
 
   renderer.render(scene, camera);
